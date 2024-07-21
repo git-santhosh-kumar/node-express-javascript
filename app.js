@@ -1,13 +1,44 @@
 const express = require('express');
+// init app and middleware
 const app = express();
+app.use(express.json());
 
-app.get('/', (req, res) => {
-    res.send('Server is running. You are in home page.')
-})
+const { connectToDb, getDb } = require('./db');
 
-const todosRoutes = require('./src/routes/todos');
-app.use('/todos', todosRoutes);
+/* Connet to database */
+let db;
 
-app.listen(3000, () => {
-    console.log(`Server listening on 3000`);
-})
+connectToDb((err) => {
+    console.log(`****connectToDb****`, typeof err);
+    if(typeof err !== undefined) {
+        // Listen to the server only when database is connected.
+        app.listen(3000, () => {
+            console.log(`Server listening on 3000`);
+        })
+
+        // get the database connection.
+        db = getDb()
+
+        // routes goes here
+        app.get('/', async (req, res) => {
+            try {
+                const movies = await db.collection("movies").find()
+                .sort({ year: 1 })
+                .limit(10)
+                .toArray();
+                
+                res.status(200).json(movies)
+            } catch(err) {
+                res.status(500).json({ error: "Could not fetch the documents", err })
+            } 
+        });
+        
+        /* Todos apis */
+        const todosRoutes = require('./src/routes/todos');
+        app.use('/todos', todosRoutes);
+        
+        /* Users apis */
+        const usersRoutes = require('./src/routes/users')(db);
+        app.use('/users', usersRoutes);
+    }
+});
