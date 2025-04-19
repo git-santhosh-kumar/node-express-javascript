@@ -66,5 +66,14 @@ npm install axios
 `/login` to login and get a new token.
 `/profile` get profile protected.
 
+📦 Technologies Used:
+`express` – web framework
+`mongoose` – MongoDB ODM
+`jsonwebtoken` – for auth
+`bcryptjs` – password hashing
+`nodemailer` – sending email
+`dotenv` – env configs
+
 #Add below packages to implement above api's
-`npm install jsonwebtoken dotenv bcryptjs`
+`npm install jsonwebtoken dotenv bcryptjs mongoose nodemailer`
+

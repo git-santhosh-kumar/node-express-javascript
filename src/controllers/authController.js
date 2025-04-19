@@ -1,7 +1,9 @@
-const fs = require('fs');
+const User = require('../models/user');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { sendVerificationEmail } = require('../utils/sendEmails');
+const crypto = require('crypto');
 
 const usersFile = path.join(__dirname, '../rawdata/users.json');
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -10,45 +12,53 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const getUsers = () => JSON.parse(fs.readFileSync(usersFile, 'utf8'));
 const saveUsers = users => fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
 
-exports.register = (req, res) => {
-    const { username, password } = req.body;
+exports.register = async (req, res) => {
+    const { username, email, password, role } = req.body;
   
-    try {
-        const users = getUsers();
+    const existing = await User.findOne({ $or: [{ username }, { email }] });
+    if (existing) return res.status(400).json({ error: 'User exists' });
 
-        if (users.find(u => u.username === username)) {
-            return res.status(400).json({ error: 'User already exists' });
-        }
+    const hashed = await bcrypt.hash(password, 10);
+    const verifyToken = crypto.randomBytes(20).toString('hex');
 
-        const hashedPassword = bcrypt.hashSync(password, 10);
-        users.push({ username, password: hashedPassword });
-        saveUsers(users);
+    const user = new User({ username, email, password: hashed, role, verifyToken });
+    await user.save();
 
-        res.status(201).json({ message: 'User registered successfully' });
-    } catch(err) {
-        console.error(err);
-        res.status(500).json({ error: 'Internal server error' });
-    }
+    await sendVerificationEmail(email, verifyToken);
+    res.status(201).json({ message: 'User created. Check email to verify.' });
 };
 
-exports.login = (req, res) => {
+exports.verifyEmail = async (req, res) => {
+    const { token } = req.query;
+    const user = await User.findOne({ verifyToken: token });
+    if (!user) return res.status(400).json({ error: 'Invalid token' });
+  
+    user.isVerified = true;
+    user.verifyToken = undefined;
+    await user.save();
+    res.json({ message: 'Email verified. You can now log in.' });
+};
+
+exports.login = async (req, res) => {
     const { username, password } = req.body;
-    try {
-        const users = getUsers();
-
-        const user = users.find(u => u.username === username);
-        if (!user || !bcrypt.compareSync(password, user.password)) {
-            return res.status(401).json({ error: 'Invalid credentials' });
-        }
-
-        const token = jwt.sign({ username: user.username }, JWT_SECRET, { expiresIn: '1h' });
-        res.json({ token });
-    } catch(err) {
-        console.error(err);
-        res.status(500).json({ error: 'Internal server error' });
-    }
+    const user = await User.findOne({ username });
+    if (!user) return res.status(400).json({ error: 'User not found' });
+    if (!user.isVerified) return res.status(403).json({ error: 'Email not verified' });
+  
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ error: 'Wrong password' });
+  
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
+      expiresIn: '1h',
+    });
+    res.json({ token });
 };
 
-exports.getProfile = (req, res) => {
-  res.json({ message: `Welcome, ${req.user.username}` });
+exports.getProfile = async (req, res) => {
+    const user = await User.findById(req.user.id).select('-password');
+    res.json(user);
+};
+
+exports.adminRoute = async (req, res) => {
+    res.json({ message: 'Welcome Admin!' });
 };
