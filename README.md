@@ -58,3 +58,13 @@ npm install mongodb --save
 ```bash
 npm install axios
 ```
+
+## Rest API service created under `index.js` to support router auth.
+
+#Below are the api's to implement.
+`/register` to register a new user.
+`/login` to login and get a new token.
+`/profile` get profile protected.
+
+#Add below packages to implement above api's
+`npm install jsonwebtoken dotenv bcryptjs`

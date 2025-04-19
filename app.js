@@ -4,6 +4,7 @@ const app = express();
 app.use(express.json());
 
 const { connectToDb, getDb } = require('./db');
+const PORT = process.env.PORT || 5000;
 
 /* Connet to database */
 let db;
@@ -12,8 +13,8 @@ connectToDb((err) => {
     console.log(`****connectToDb****`, typeof err);
     if(typeof err !== undefined) {
         // Listen to the server only when database is connected.
-        app.listen(3000, () => {
-            console.log(`Server listening on 3000`);
+        app.listen(PORT, () => {
+            console.log(`Server listening on ${PORT}`);
         })
 
         // get the database connection.
